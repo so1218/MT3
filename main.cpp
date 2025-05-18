@@ -639,7 +639,6 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		Novice::DrawLine(int(start.x), int(start.y), int(end.x), int(end.y), WHITE);
 
 		ImGui::Begin("MyWindow");
-
 		ImGui::DragFloat3("sphere1.position", &sphere1.center.x, 0.07f, 0, 1280);
 		ImGui::DragFloat3("sphere2.position", &sphere2.center.x, 0.07f, 0, 1280);
 		ImGui::InputFloat3("Segment origin", &segment.origin.x, "%.3f", ImGuiInputTextFlags_ReadOnly);
