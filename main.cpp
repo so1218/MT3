@@ -59,7 +59,7 @@ void DrawGrid(const Matrix4x4& viewProjectionMatrix, const Matrix4x4& viewportMa
 		start = Transform(Transform(start, viewProjectionMatrix), viewportMatrix);
 		end = Transform(Transform(end, viewProjectionMatrix), viewportMatrix);
 
-		Novice::DrawLine(static_cast<int>(start.x), static_cast<int>(start.y), static_cast<int>(end.x), static_cast<int>(end.y), RED);
+		Novice::DrawLine(static_cast<int>(start.x), static_cast<int>(start.y), static_cast<int>(end.x), static_cast<int>(end.y), 0x555555ff);
 	}
 
 	// 左から右への線を順々に引いていく
@@ -73,7 +73,7 @@ void DrawGrid(const Matrix4x4& viewProjectionMatrix, const Matrix4x4& viewportMa
 		start = Transform(Transform(start, viewProjectionMatrix), viewportMatrix);
 		end = Transform(Transform(end, viewProjectionMatrix), viewportMatrix);
 
-		Novice::DrawLine(static_cast<int>(start.x), static_cast<int>(start.y), static_cast<int>(end.x), static_cast<int>(end.y), RED);
+		Novice::DrawLine(static_cast<int>(start.x), static_cast<int>(start.y), static_cast<int>(end.x), static_cast<int>(end.y), 0x555555ff);
 	}
 }
 
@@ -156,7 +156,7 @@ Vector3 Add(const Vector3& v1, const Vector3& v2)
 	return { v1.x + v2.x, v1.y + v2.y, v1.z + v2.z };
 }
 
-bool isCollision(const Sphere& sphere, const Plane& plane)
+bool IsCollision(const Sphere& sphere, const Plane& plane)
 {
 	// 球の中心と平面の距離を計算
 	float distanceFromCenterToPlane = std::abs(
@@ -165,6 +165,24 @@ bool isCollision(const Sphere& sphere, const Plane& plane)
 
 	// 球の半径以下なら衝突とみなす
 	return distanceFromCenterToPlane <= sphere.radius;
+}
+
+bool IsCollision(const Segment& segment, const Plane& plane)
+{
+	// 線の方向ベクトルと平面の法線ベクトルの内積を計算
+	float dot = Dot(plane.normal, segment.diff);
+
+	// 線が平面と平行な場合
+	if (dot == 0.0f)
+	{
+		return false;
+	}
+
+	// 交点までのパラメーター t を計算
+	float t = (plane.distance - Dot(plane.normal, segment.origin)) / dot;
+
+	// 交点が線分上にあるかチェック
+	return t >= 0.0f && t <= 1.0f;
 }
 
 Vector3 Perpendicular(const Vector3& vector)
@@ -219,10 +237,12 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	Vector3 rotate = { 0.0f,0.0f,0.0f };
 	Vector3 translate = { 0.0f,0.0f,0.0 };
 	Vector3 cameraScale = { 1.0f,1.0f,1.0f };
-	Vector3 cameraRotate = { 0.26f,0.0f,0.0f };
-	Vector3 cameraTranslate = { 0.0f,1.9f,-6.49f };
+	Vector3 cameraRotate = { 0.05f,0.0f,0.0f };
+	Vector3 cameraTranslate = { 0.0f,1.0f,-6.49f };
 
-	Segment segment{ {-2.0f,-1.0f,0.0f},{3.0f,2.0f,2.0f} };
+	Segment segment;
+	segment.origin = { 0.0f, 0.33f, 0.45f };
+	segment.diff = { 0.3f, 0.58f, 0.45f };
 	Vector3 center1{ -1.5f,0.6f,0.6f };
 	Vector3 center2{ 1.0f,0.6f,0.6f };
 
@@ -232,10 +252,12 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	// 速度
 	const float moveSpeed = 0.1f;
 
+
 	Sphere sphere1{ center1,0.4f };// 1cmの球を描画
 	Sphere sphere2{ center2,0.4f };
 
-	Plane plane{ {1,0,0},0 };
+	Plane plane{ {0,1,0},1 };
+
 
 	// ウィンドウの×ボタンが押されるまでループ
 	while (Novice::ProcessMessage() == 0) {
@@ -281,9 +303,12 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 		// ViewportMatrixを作る
 		Matrix4x4 viewportMatrix = MakeViewportMatrix(0, 0, 1280, 720, 0.0f, 1.0f);
+		// 線の終点を計算する
+		Vector3 segmentTrueEnd = Add(segment.origin, segment.diff);
 
+		// start と end をワールド座標系からスクリーン座標系へ変換
 		Vector3 start = Transform(Transform(segment.origin, worldViewProjectionMatrix), viewportMatrix);
-		Vector3 end = Transform(Transform(segment.diff, worldViewProjectionMatrix), viewportMatrix);
+		Vector3 end = Transform(Transform(segmentTrueEnd, worldViewProjectionMatrix), viewportMatrix); // 修正後
 
 		if (isCollision(sphere1, sphere2))
 		{
@@ -294,9 +319,18 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			sphere1.color = BLACK;
 		}
 		plane.normal = Normalize(plane.normal);
-		if (isCollision(sphere1, plane))
+		if (IsCollision(sphere1, plane))
 		{
 			sphere1.color = RED;
+		}
+
+		if (IsCollision(segment, plane))
+		{
+			segment.color = RED;
+		}
+		else
+		{
+			segment.color = WHITE;
 		}
 
 		///
@@ -311,14 +345,14 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		DrawGrid(worldViewProjectionMatrix, viewportMatrix);
 		DrawSphere(sphere1, worldViewProjectionMatrix, viewportMatrix, sphere1.color);
 		DrawSphere(sphere2, worldViewProjectionMatrix, viewportMatrix, BLACK);
-		Novice::DrawLine(int(start.x), int(start.y), int(end.x), int(end.y), WHITE);
+		Novice::DrawLine(int(start.x), int(start.y), int(end.x), int(end.y), segment.color);
 		DrawPlane(plane, worldViewProjectionMatrix, viewportMatrix, BLACK);
 
 		ImGui::Begin("MyWindow");
 		ImGui::DragFloat3("sphere1.position", &sphere1.center.x, 0.07f, -1280, 1280);
 		ImGui::DragFloat3("sphere2.position", &sphere2.center.x, 0.07f, 0, 1280);
-		ImGui::InputFloat3("Segment origin", &segment.origin.x, "%.3f", ImGuiInputTextFlags_ReadOnly);
-		ImGui::InputFloat3("Segment diff", &segment.diff.x, "%.3f", ImGuiInputTextFlags_ReadOnly);
+		ImGui::DragFloat3("Segment origin", &segment.origin.x, 0.07f, -1280, 1280);
+		ImGui::DragFloat3("Segment diff", &segment.diff.x, 0.07f, -1280, 1280);
 		ImGui::InputFloat3("Project", &project.x, "%.3f", ImGuiInputTextFlags_ReadOnly);
 		ImGui::DragFloat3("normal", &plane.normal.x, 0.07f, -1, 1);
 		ImGui::DragFloat("distance", &plane.distance, 0.07f, 0, 1280);
@@ -327,6 +361,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		ImGui::DragFloat3("cameraTranslate", &cameraTranslate.x, 0.07f, -1280, 1280);
 
 		ImGui::End();
+
 
 		plane.normal = Normalize(plane.normal);
 
