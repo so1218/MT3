@@ -185,6 +185,64 @@ bool IsCollision(const Segment& segment, const Plane& plane)
 	return t >= 0.0f && t <= 1.0f;
 }
 
+bool IsCollision(const Triangle& triangle, const Segment& segment)
+{
+	// 線分と三角形を含む平面の交差判定
+	// 三角形の法線を計算
+	Vector3 edge1 = Subtract(triangle.vertices[1], triangle.vertices[0]);
+	Vector3 edge2 = Subtract(triangle.vertices[2], triangle.vertices[0]);
+	Vector3 triangleNormal = Normalize(Cross(edge1, edge2));
+
+	// 三角形を含む平面を定義
+	Plane trianglePlane;
+	trianglePlane.normal = triangleNormal;
+	trianglePlane.distance = Dot(triangleNormal, triangle.vertices[0]); // 平面までの距離
+
+	// 線分が平面と平行な場合
+	float dotSegmentNormal = Dot(segment.diff, trianglePlane.normal);
+	if (dotSegmentNormal == 0.0f) {
+		return false;
+	}
+
+	// 交点までのパラメーター t を計算
+	float t = (trianglePlane.distance - Dot(trianglePlane.normal, segment.origin)) / dotSegmentNormal;
+
+	// 交点が線分上にあるかチェック
+	if (t < 0.0f || t > 1.0f) {
+		return false; // 線分の外で交差している
+	}
+
+	// 交点を計算
+	Vector3 intersectionPoint = Add(segment.origin, Multiply(t, segment.diff));
+
+	// 2交点が三角形の内部にあるかの判定
+
+	// V0を始点とする辺V0V1、V0から交点Pへのベクトル
+	Vector3 v01 = Subtract(triangle.vertices[1], triangle.vertices[0]);
+	Vector3 v0p = Subtract(intersectionPoint, triangle.vertices[0]);
+	Vector3 cross01 = Cross(v01, v0p);
+
+	// V1を始点とする辺V1V2、V1から交点Pへのベクトル
+	Vector3 v12 = Subtract(triangle.vertices[2], triangle.vertices[1]);
+	Vector3 v1p = Subtract(intersectionPoint, triangle.vertices[1]);
+	Vector3 cross12 = Cross(v12, v1p);
+
+	// V2を始点とする辺V2V0、V2から交点Pへのベクトル
+	Vector3 v20 = Subtract(triangle.vertices[0], triangle.vertices[2]);
+	Vector3 v2p = Subtract(intersectionPoint, triangle.vertices[2]);
+	Vector3 cross20 = Cross(v20, v2p);
+
+	// 各クロス積と三角形の法線との内積を計算
+	float dot01 = Dot(cross01, triangleNormal);
+	float dot12 = Dot(cross12, triangleNormal);
+	float dot20 = Dot(cross20, triangleNormal);
+
+	// すべての内積が同じ符号（または0）であれば、交点は三角形の内部にある
+	
+	return (dot01 == 0 && dot12 == 0 && dot20 == 0) ||
+		(dot01 == 0 && dot12 == 0 && dot20 == 0);
+}
+
 Vector3 Perpendicular(const Vector3& vector)
 {
 	if (vector.x != 0.0f || vector.y != 0.0f)
@@ -218,6 +276,23 @@ void DrawPlane(const Plane& plane, const Matrix4x4& viewProjectionMatrix, const 
 	Novice::DrawLine((int)points[1].x, (int)points[1].y, (int)points[2].x, (int)points[2].y, color);
 }
 
+void DrawTriangle(const Triangle& triangle, const Matrix4x4& viewProjectionMatrix, const Matrix4x4& viewportMatrix, uint32_t color)
+{
+	// 1番目の頂点を変換
+	Vector3 p0 = Transform(Transform(triangle.vertices[0], viewProjectionMatrix), viewportMatrix);
+	// 2番目の頂点を変換
+	Vector3 p1 = Transform(Transform(triangle.vertices[1], viewProjectionMatrix), viewportMatrix);
+	// 3番目の頂点を変換
+	Vector3 p2 = Transform(Transform(triangle.vertices[2], viewProjectionMatrix), viewportMatrix);
+
+	Novice::DrawTriangle(
+		static_cast<int>(p0.x), static_cast<int>(p0.y),
+		static_cast<int>(p1.x), static_cast<int>(p1.y),
+		static_cast<int>(p2.x), static_cast<int>(p2.y),
+		color, kFillModeWireFrame
+	);
+}
+
 // Windowsアプリでのエントリーポイント(main関数)
 int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
@@ -241,8 +316,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	Vector3 cameraTranslate = { 0.0f,1.0f,-6.49f };
 
 	Segment segment;
-	segment.origin = { 0.0f, 0.33f, 0.45f };
-	segment.diff = { 0.3f, 0.58f, 0.45f };
+	segment.origin = { 0.0f, 0.33f, 0.0f };
+	segment.diff = { 0.3f, 0.58f, 0.0f };
 	Vector3 center1{ -1.5f,0.6f,0.6f };
 	Vector3 center2{ 1.0f,0.6f,0.6f };
 
@@ -258,6 +333,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 	Plane plane{ {0,1,0},1 };
 
+	Triangle triangle;
+	triangle.vertices[0] = { 0, 0, 1 };
+	triangle.vertices[1] = { 0, 1, 0 };
+	triangle.vertices[2] = { 0, 0, -1 };
 
 	// ウィンドウの×ボタンが押されるまでループ
 	while (Novice::ProcessMessage() == 0) {
@@ -333,6 +412,15 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			segment.color = WHITE;
 		}
 
+		if (IsCollision(triangle, segment))
+		{
+			segment.color = RED;
+		}
+		else
+		{
+			segment.color = WHITE;
+		}
+
 		///
 		/// ↑更新処理ここまで
 		///
@@ -343,25 +431,28 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		///
 
 		DrawGrid(worldViewProjectionMatrix, viewportMatrix);
-		DrawSphere(sphere1, worldViewProjectionMatrix, viewportMatrix, sphere1.color);
-		DrawSphere(sphere2, worldViewProjectionMatrix, viewportMatrix, BLACK);
+		/*DrawSphere(sphere1, worldViewProjectionMatrix, viewportMatrix, sphere1.color);
+		DrawSphere(sphere2, worldViewProjectionMatrix, viewportMatrix, BLACK);*/
 		Novice::DrawLine(int(start.x), int(start.y), int(end.x), int(end.y), segment.color);
-		DrawPlane(plane, worldViewProjectionMatrix, viewportMatrix, BLACK);
+		/*DrawPlane(plane, worldViewProjectionMatrix, viewportMatrix, BLACK);*/
+		DrawTriangle(triangle, worldViewProjectionMatrix, viewportMatrix, WHITE);
 
 		ImGui::Begin("MyWindow");
-		ImGui::DragFloat3("sphere1.position", &sphere1.center.x, 0.07f, -1280, 1280);
-		ImGui::DragFloat3("sphere2.position", &sphere2.center.x, 0.07f, 0, 1280);
+		ImGui::DragFloat3("triangle.v0", &triangle.vertices[0].x, 0.07f, -1280, 1280);
+		ImGui::DragFloat3("triangle.v1", &triangle.vertices[1].x, 0.07f, -1280, 1280);
+		ImGui::DragFloat3("triangle.v2", &triangle.vertices[2].x, 0.07f, -1280, 1280);
+		/*ImGui::DragFloat3("sphere1.position", &sphere1.center.x, 0.07f, -1280, 1280);
+		ImGui::DragFloat3("sphere2.position", &sphere2.center.x, 0.07f, 0, 1280);*/
 		ImGui::DragFloat3("Segment origin", &segment.origin.x, 0.07f, -1280, 1280);
 		ImGui::DragFloat3("Segment diff", &segment.diff.x, 0.07f, -1280, 1280);
-		ImGui::InputFloat3("Project", &project.x, "%.3f", ImGuiInputTextFlags_ReadOnly);
+		/*ImGui::InputFloat3("Project", &project.x, "%.3f", ImGuiInputTextFlags_ReadOnly);
 		ImGui::DragFloat3("normal", &plane.normal.x, 0.07f, -1, 1);
-		ImGui::DragFloat("distance", &plane.distance, 0.07f, 0, 1280);
+		ImGui::DragFloat("distance", &plane.distance, 0.07f, 0, 1280);*/
 		ImGui::DragFloat3("cameraScale", &cameraScale.x, 0.07f, 0, 10);
 		ImGui::DragFloat3("cameraRotate", &cameraRotate.x, 0.07f, -10, 10);
 		ImGui::DragFloat3("cameraTranslate", &cameraTranslate.x, 0.07f, -1280, 1280);
 
 		ImGui::End();
-
 
 		plane.normal = Normalize(plane.normal);
 
