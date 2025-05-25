@@ -86,10 +86,12 @@ struct Segment
 {
 	Vector3 origin;// 始点
 	Vector3 diff;// 終点への差分ベクトル
+	uint32_t color;
 };
 
 struct Plane
 {
 	Vector3 normal;// 法線
 	float distance;// 距離
+	uint32_t color;
 };
