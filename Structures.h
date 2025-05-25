@@ -95,3 +95,8 @@ struct Plane
 	float distance;// 距離
 	uint32_t color;
 };
+
+struct Triangle
+{
+	Vector3 vertices[3];
+};
