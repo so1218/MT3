@@ -255,6 +255,27 @@ bool isCollision(const AABB& aabb1, const AABB& aabb2)
 	return false;
 }
 
+float DistanceSquared(const Vector3& a, const Vector3& b) 
+{
+	float dx = a.x - b.x;
+	float dy = a.y - b.y;
+	float dz = a.z - b.z;
+	return dx * dx + dy * dy + dz * dz;
+}
+
+bool IsCollision(const AABB& aabb, const Sphere& sphere)
+{
+	// 球の中心をAABBに投影(最近傍点を求める)
+	Vector3 closestPoint;
+	closestPoint.x = std::clamp(sphere.center.x, aabb.min.x, aabb.max.x);
+	closestPoint.y = std::clamp(sphere.center.y, aabb.min.y, aabb.max.y);
+	closestPoint.z = std::clamp(sphere.center.z, aabb.min.z, aabb.max.z);
+
+	// 最近傍点との距離の2乗を計算し、半径の2乗以下なら衝突
+	float distSq = DistanceSquared(closestPoint, sphere.center);
+	return distSq <= sphere.radius * sphere.radius;
+}
+
 Vector3 Perpendicular(const Vector3& vector)
 {
 	if (vector.x != 0.0f || vector.y != 0.0f)
@@ -385,13 +406,13 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	Vector3 rotate = { 0.0f,0.0f,0.0f };
 	Vector3 translate = { 0.0f,0.0f,0.0 };
 	Vector3 cameraScale = { 1.0f,1.0f,1.0f };
-	Vector3 cameraRotate = { 0.05f,0.0f,0.0f };
-	Vector3 cameraTranslate = { 0.0f,1.0f,-6.49f };
+	Vector3 cameraRotate = { 0.05f,-1.40f,0.14f };
+	Vector3 cameraTranslate = { 8.19f,1.63f,-0.820f };
 
 	Segment segment;
 	segment.origin = { 0.0f, 0.33f, 0.0f };
 	segment.diff = { 0.3f, 0.58f, 0.0f };
-	Vector3 center1{ -1.5f,0.6f,0.6f };
+	Vector3 center1{ 1.160f,0.6f,-1.290f };
 	Vector3 center2{ 1.0f,0.6f,0.6f };
 
 	Vector3 project = Project(Subtract(center1, segment.origin), segment.diff);
@@ -412,15 +433,15 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 	AABB aabb1
 	{
-		.min{-0.5f,-0.5f,-0.5f},
-		.max{0.0f,0.0f,0.0f}
+		.min{-1.13f,-0.5f,-0.5f},
+		.max{2.24f,0.910f,1.82f}
 	};
 
-	AABB aabb2
+	/*AABB aabb2
 	{
 		.min{0.2f,0.2f,0.2f},
 		.max{1.0f,1.0f,1.0f}
-	};
+	};*/
 
 	aabb1.min.x = (std::min)(aabb1.min.x, aabb1.max.x);
 	aabb1.max.x = (std::max)(aabb1.min.x, aabb1.max.x);
@@ -480,19 +501,20 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		Vector3 start = Transform(Transform(segment.origin, worldViewProjectionMatrix), viewportMatrix);
 		Vector3 end = Transform(Transform(segmentTrueEnd, worldViewProjectionMatrix), viewportMatrix); // 修正後
 
-		if (isCollision(sphere1, sphere2))
+		sphere1.color = WHITE;
+		/*if (isCollision(sphere1, sphere2))
 		{
 			sphere1.color = RED;
 		}
 		else
 		{
 			sphere1.color = BLACK;
-		}
+		}*/
 		plane.normal = Normalize(plane.normal);
-		if (IsCollision(sphere1, plane))
+		/*if (IsCollision(sphere1, plane))
 		{
 			sphere1.color = RED;
-		}
+		}*/
 
 		if (IsCollision(segment, plane))
 		{
@@ -512,7 +534,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			segment.color = WHITE;
 		}
 
-		if (isCollision(aabb1, aabb2))
+		if (IsCollision(aabb1, sphere1))
 		{
 			aabb1.color = RED;
 		}
@@ -531,13 +553,13 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		///
 
 		DrawGrid(worldViewProjectionMatrix, viewportMatrix);
-		/*DrawSphere(sphere1, worldViewProjectionMatrix, viewportMatrix, sphere1.color);
-		DrawSphere(sphere2, worldViewProjectionMatrix, viewportMatrix, BLACK);*/
+		DrawSphere(sphere1, worldViewProjectionMatrix, viewportMatrix, sphere1.color);
+		/*DrawSphere(sphere2, worldViewProjectionMatrix, viewportMatrix, BLACK);*/
 		/*Novice::DrawLine(int(start.x), int(start.y), int(end.x), int(end.y), segment.color);*/
 		/*DrawPlane(plane, worldViewProjectionMatrix, viewportMatrix, BLACK);*/
 		/*DrawTriangle(triangle, worldViewProjectionMatrix, viewportMatrix, WHITE);*/
 		DrawAABB(aabb1, worldViewProjectionMatrix, viewportMatrix, aabb1.color);
-		DrawAABB(aabb2, worldViewProjectionMatrix, viewportMatrix, WHITE);
+		/*DrawAABB(aabb2, worldViewProjectionMatrix, viewportMatrix, WHITE);*/
 		ImGui::Begin("MyWindow");
 		ImGui::DragFloat3("aabb1.min", &aabb1.min.x, 0.07f, -1280, 1280);
 		ImGui::DragFloat3("aabb1.max", &aabb1.max.x, 0.07f, -1280, 1280);
@@ -547,21 +569,21 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		aabb1.max.y = (std::max)(aabb1.min.y, aabb1.max.y);
 		aabb1.min.z = (std::min)(aabb1.min.z, aabb1.max.z);
 		aabb1.max.z = (std::max)(aabb1.min.z, aabb1.max.z);
-		ImGui::DragFloat3("aabb2.min", &aabb2.min.x, 0.07f, -1280, 1280);
-		ImGui::DragFloat3("aabb2.max", &aabb2.max.x, 0.07f, -1280, 1280);
-		aabb2.min.x = (std::min)(aabb2.min.x, aabb2.max.x);
+		/*ImGui::DragFloat3("aabb2.min", &aabb2.min.x, 0.07f, -1280, 1280);
+		ImGui::DragFloat3("aabb2.max", &aabb2.max.x, 0.07f, -1280, 1280);*/
+		/*aabb2.min.x = (std::min)(aabb2.min.x, aabb2.max.x);
 		aabb2.max.x = (std::max)(aabb2.min.x, aabb2.max.x);
 		aabb2.min.y = (std::min)(aabb2.min.y, aabb2.max.y);
 		aabb2.max.y = (std::max)(aabb2.min.y, aabb2.max.y);
 		aabb2.min.z = (std::min)(aabb2.min.z, aabb2.max.z);
-		aabb2.max.z = (std::max)(aabb2.min.z, aabb2.max.z);
-		ImGui::DragFloat3("triangle.v0", &triangle.vertices[0].x, 0.07f, -1280, 1280);
+		aabb2.max.z = (std::max)(aabb2.min.z, aabb2.max.z);*/
+		/*ImGui::DragFloat3("triangle.v0", &triangle.vertices[0].x, 0.07f, -1280, 1280);
 		ImGui::DragFloat3("triangle.v1", &triangle.vertices[1].x, 0.07f, -1280, 1280);
-		ImGui::DragFloat3("triangle.v2", &triangle.vertices[2].x, 0.07f, -1280, 1280);
-		/*ImGui::DragFloat3("sphere1.position", &sphere1.center.x, 0.07f, -1280, 1280);
-		ImGui::DragFloat3("sphere2.position", &sphere2.center.x, 0.07f, 0, 1280);*/
-		ImGui::DragFloat3("Segment origin", &segment.origin.x, 0.07f, -1280, 1280);
-		ImGui::DragFloat3("Segment diff", &segment.diff.x, 0.07f, -1280, 1280);
+		ImGui::DragFloat3("triangle.v2", &triangle.vertices[2].x, 0.07f, -1280, 1280);*/
+		ImGui::DragFloat3("sphere1.position", &sphere1.center.x, 0.07f, -1280, 1280);
+		/*ImGui::DragFloat3("sphere2.position", &sphere2.center.x, 0.07f, 0, 1280);*/
+		/*ImGui::DragFloat3("Segment origin", &segment.origin.x, 0.07f, -1280, 1280);
+		ImGui::DragFloat3("Segment diff", &segment.diff.x, 0.07f, -1280, 1280);*/
 		/*ImGui::InputFloat3("Project", &project.x, "%.3f", ImGuiInputTextFlags_ReadOnly);
 		ImGui::DragFloat3("normal", &plane.normal.x, 0.07f, -1, 1);
 		ImGui::DragFloat("distance", &plane.distance, 0.07f, 0, 1280);*/
