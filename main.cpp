@@ -243,6 +243,39 @@ bool IsCollision(const Triangle& triangle, const Segment& segment)
 		(dot01 == 0 && dot12 == 0 && dot20 == 0);
 }
 
+bool isCollision(const AABB& aabb1, const AABB& aabb2)
+{
+	if ((aabb1.min.x <= aabb2.max.x && aabb1.max.x >= aabb2.min.x) &&
+		(aabb1.min.y <= aabb2.max.y && aabb1.max.y >= aabb2.min.y) &&
+		(aabb1.min.z <= aabb2.max.z && aabb1.max.z >= aabb2.min.z))
+	{
+		return true;
+	}
+
+	return false;
+}
+
+float DistanceSquared(const Vector3& a, const Vector3& b) 
+{
+	float dx = a.x - b.x;
+	float dy = a.y - b.y;
+	float dz = a.z - b.z;
+	return dx * dx + dy * dy + dz * dz;
+}
+
+bool IsCollision(const AABB& aabb, const Sphere& sphere)
+{
+	// 球の中心をAABBに投影(最近傍点を求める)
+	Vector3 closestPoint;
+	closestPoint.x = std::clamp(sphere.center.x, aabb.min.x, aabb.max.x);
+	closestPoint.y = std::clamp(sphere.center.y, aabb.min.y, aabb.max.y);
+	closestPoint.z = std::clamp(sphere.center.z, aabb.min.z, aabb.max.z);
+
+	// 最近傍点との距離の2乗を計算し、半径の2乗以下なら衝突
+	float distSq = DistanceSquared(closestPoint, sphere.center);
+	return distSq <= sphere.radius * sphere.radius;
+}
+
 Vector3 Perpendicular(const Vector3& vector)
 {
 	if (vector.x != 0.0f || vector.y != 0.0f)
@@ -293,6 +326,67 @@ void DrawTriangle(const Triangle& triangle, const Matrix4x4& viewProjectionMatri
 	);
 }
 
+void DrawAABB(const AABB& aabb, const Matrix4x4& viewProjectionMatrix, const Matrix4x4& viewportMatrix, uint32_t color) 
+{
+	// AABBの8つの頂点を計算
+	Vector3 vertices[8];
+	vertices[0] = { aabb.min.x, aabb.min.y, aabb.min.z }; 
+	vertices[1] = { aabb.max.x, aabb.min.y, aabb.min.z }; 
+	vertices[2] = { aabb.max.x, aabb.max.y, aabb.min.z }; 
+	vertices[3] = { aabb.min.x, aabb.max.y, aabb.min.z }; 
+
+	vertices[4] = { aabb.min.x, aabb.min.y, aabb.max.z }; 
+	vertices[5] = { aabb.max.x, aabb.min.y, aabb.max.z }; 
+	vertices[6] = { aabb.max.x, aabb.max.y, aabb.max.z }; 
+	vertices[7] = { aabb.min.x, aabb.max.y, aabb.max.z }; 
+
+	// AABBのエッジのインデックス 
+	int edges[12][2] = {
+		{0, 1}, {1, 2}, {2, 3}, {3, 0}, // 底面
+		{4, 5}, {5, 6}, {6, 7}, {7, 4}, // 天面
+		{0, 4}, {1, 5}, {2, 6}, {3, 7}  // 側面
+	};
+
+	// 変換された頂点座標を格納する配列
+	Vector2 projectedVertices[8];
+
+	for (int i = 0; i < 8; ++i) {
+		
+		float x = vertices[i].x * viewProjectionMatrix.m[0][0] + vertices[i].y * viewProjectionMatrix.m[1][0] + vertices[i].z * viewProjectionMatrix.m[2][0] + viewProjectionMatrix.m[3][0];
+		float y = vertices[i].x * viewProjectionMatrix.m[0][1] + vertices[i].y * viewProjectionMatrix.m[1][1] + vertices[i].z * viewProjectionMatrix.m[2][1] + viewProjectionMatrix.m[3][1];
+		float z = vertices[i].x * viewProjectionMatrix.m[0][2] + vertices[i].y * viewProjectionMatrix.m[1][2] + vertices[i].z * viewProjectionMatrix.m[2][2] + viewProjectionMatrix.m[3][2];
+		float w = vertices[i].x * viewProjectionMatrix.m[0][3] + vertices[i].y * viewProjectionMatrix.m[1][3] + vertices[i].z * viewProjectionMatrix.m[2][3] + viewProjectionMatrix.m[3][3];
+		if (w <= 0.0001f) 
+		{ 
+			projectedVertices[i] = { -9999, -9999 };
+			continue;
+		}
+		Vector3 ndc_coord = { x / w, y / w, z / w };
+
+		
+		float screenX = ndc_coord.x * viewportMatrix.m[0][0] + ndc_coord.y * viewportMatrix.m[1][0] + ndc_coord.z * viewportMatrix.m[2][0] + viewportMatrix.m[3][0];
+		float screenY = ndc_coord.x * viewportMatrix.m[0][1] + ndc_coord.y * viewportMatrix.m[1][1] + ndc_coord.z * viewportMatrix.m[2][1] + viewportMatrix.m[3][1];
+
+		projectedVertices[i] = { screenX, screenY };
+	}
+
+	// 各エッジを2Dで描画
+	for (int i = 0; i < 12; ++i) {
+		int v1_idx = edges[i][0];
+		int v2_idx = edges[i][1];
+
+		// 画面外に変換された頂点を含む線は描画しない (簡易クリッピング)
+		if (projectedVertices[v1_idx].x == -9999 || projectedVertices[v2_idx].x == -9999) {
+			continue;
+		}
+
+		
+		Novice::DrawLine((int)projectedVertices[v1_idx].x, (int)projectedVertices[v1_idx].y,
+			(int)projectedVertices[v2_idx].x, (int)projectedVertices[v2_idx].y,
+			color);
+	}
+}
+
 // Windowsアプリでのエントリーポイント(main関数)
 int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
@@ -312,13 +406,13 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	Vector3 rotate = { 0.0f,0.0f,0.0f };
 	Vector3 translate = { 0.0f,0.0f,0.0 };
 	Vector3 cameraScale = { 1.0f,1.0f,1.0f };
-	Vector3 cameraRotate = { 0.05f,0.0f,0.0f };
-	Vector3 cameraTranslate = { 0.0f,1.0f,-6.49f };
+	Vector3 cameraRotate = { 0.05f,-1.40f,0.14f };
+	Vector3 cameraTranslate = { 8.19f,1.63f,-0.820f };
 
 	Segment segment;
 	segment.origin = { 0.0f, 0.33f, 0.0f };
 	segment.diff = { 0.3f, 0.58f, 0.0f };
-	Vector3 center1{ -1.5f,0.6f,0.6f };
+	Vector3 center1{ 1.160f,0.6f,-1.290f };
 	Vector3 center2{ 1.0f,0.6f,0.6f };
 
 	Vector3 project = Project(Subtract(center1, segment.origin), segment.diff);
@@ -326,7 +420,6 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 	// 速度
 	const float moveSpeed = 0.1f;
-
 
 	Sphere sphere1{ center1,0.4f };// 1cmの球を描画
 	Sphere sphere2{ center2,0.4f };
@@ -337,6 +430,25 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	triangle.vertices[0] = { 0, 0, 1 };
 	triangle.vertices[1] = { 0, 1, 0 };
 	triangle.vertices[2] = { 0, 0, -1 };
+
+	AABB aabb1
+	{
+		.min{-1.13f,-0.5f,-0.5f},
+		.max{2.24f,0.910f,1.82f}
+	};
+
+	/*AABB aabb2
+	{
+		.min{0.2f,0.2f,0.2f},
+		.max{1.0f,1.0f,1.0f}
+	};*/
+
+	aabb1.min.x = (std::min)(aabb1.min.x, aabb1.max.x);
+	aabb1.max.x = (std::max)(aabb1.min.x, aabb1.max.x);
+	aabb1.min.y = (std::min)(aabb1.min.y, aabb1.max.y);
+	aabb1.max.y = (std::max)(aabb1.min.y, aabb1.max.y);
+	aabb1.min.z = (std::min)(aabb1.min.z, aabb1.max.z);
+	aabb1.max.z = (std::max)(aabb1.min.z, aabb1.max.z);
 
 	// ウィンドウの×ボタンが押されるまでループ
 	while (Novice::ProcessMessage() == 0) {
@@ -389,19 +501,20 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		Vector3 start = Transform(Transform(segment.origin, worldViewProjectionMatrix), viewportMatrix);
 		Vector3 end = Transform(Transform(segmentTrueEnd, worldViewProjectionMatrix), viewportMatrix); // 修正後
 
-		if (isCollision(sphere1, sphere2))
+		sphere1.color = WHITE;
+		/*if (isCollision(sphere1, sphere2))
 		{
 			sphere1.color = RED;
 		}
 		else
 		{
 			sphere1.color = BLACK;
-		}
+		}*/
 		plane.normal = Normalize(plane.normal);
-		if (IsCollision(sphere1, plane))
+		/*if (IsCollision(sphere1, plane))
 		{
 			sphere1.color = RED;
-		}
+		}*/
 
 		if (IsCollision(segment, plane))
 		{
@@ -421,6 +534,15 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			segment.color = WHITE;
 		}
 
+		if (IsCollision(aabb1, sphere1))
+		{
+			aabb1.color = RED;
+		}
+		else
+		{
+			aabb1.color = WHITE;
+		}
+
 		///
 		/// ↑更新処理ここまで
 		///
@@ -431,20 +553,37 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		///
 
 		DrawGrid(worldViewProjectionMatrix, viewportMatrix);
-		/*DrawSphere(sphere1, worldViewProjectionMatrix, viewportMatrix, sphere1.color);
-		DrawSphere(sphere2, worldViewProjectionMatrix, viewportMatrix, BLACK);*/
-		Novice::DrawLine(int(start.x), int(start.y), int(end.x), int(end.y), segment.color);
+		DrawSphere(sphere1, worldViewProjectionMatrix, viewportMatrix, sphere1.color);
+		/*DrawSphere(sphere2, worldViewProjectionMatrix, viewportMatrix, BLACK);*/
+		/*Novice::DrawLine(int(start.x), int(start.y), int(end.x), int(end.y), segment.color);*/
 		/*DrawPlane(plane, worldViewProjectionMatrix, viewportMatrix, BLACK);*/
-		DrawTriangle(triangle, worldViewProjectionMatrix, viewportMatrix, WHITE);
-
+		/*DrawTriangle(triangle, worldViewProjectionMatrix, viewportMatrix, WHITE);*/
+		DrawAABB(aabb1, worldViewProjectionMatrix, viewportMatrix, aabb1.color);
+		/*DrawAABB(aabb2, worldViewProjectionMatrix, viewportMatrix, WHITE);*/
 		ImGui::Begin("MyWindow");
-		ImGui::DragFloat3("triangle.v0", &triangle.vertices[0].x, 0.07f, -1280, 1280);
+		ImGui::DragFloat3("aabb1.min", &aabb1.min.x, 0.07f, -1280, 1280);
+		ImGui::DragFloat3("aabb1.max", &aabb1.max.x, 0.07f, -1280, 1280);
+		aabb1.min.x = (std::min)(aabb1.min.x, aabb1.max.x);
+		aabb1.max.x = (std::max)(aabb1.min.x, aabb1.max.x);
+		aabb1.min.y = (std::min)(aabb1.min.y, aabb1.max.y);
+		aabb1.max.y = (std::max)(aabb1.min.y, aabb1.max.y);
+		aabb1.min.z = (std::min)(aabb1.min.z, aabb1.max.z);
+		aabb1.max.z = (std::max)(aabb1.min.z, aabb1.max.z);
+		/*ImGui::DragFloat3("aabb2.min", &aabb2.min.x, 0.07f, -1280, 1280);
+		ImGui::DragFloat3("aabb2.max", &aabb2.max.x, 0.07f, -1280, 1280);*/
+		/*aabb2.min.x = (std::min)(aabb2.min.x, aabb2.max.x);
+		aabb2.max.x = (std::max)(aabb2.min.x, aabb2.max.x);
+		aabb2.min.y = (std::min)(aabb2.min.y, aabb2.max.y);
+		aabb2.max.y = (std::max)(aabb2.min.y, aabb2.max.y);
+		aabb2.min.z = (std::min)(aabb2.min.z, aabb2.max.z);
+		aabb2.max.z = (std::max)(aabb2.min.z, aabb2.max.z);*/
+		/*ImGui::DragFloat3("triangle.v0", &triangle.vertices[0].x, 0.07f, -1280, 1280);
 		ImGui::DragFloat3("triangle.v1", &triangle.vertices[1].x, 0.07f, -1280, 1280);
-		ImGui::DragFloat3("triangle.v2", &triangle.vertices[2].x, 0.07f, -1280, 1280);
-		/*ImGui::DragFloat3("sphere1.position", &sphere1.center.x, 0.07f, -1280, 1280);
-		ImGui::DragFloat3("sphere2.position", &sphere2.center.x, 0.07f, 0, 1280);*/
-		ImGui::DragFloat3("Segment origin", &segment.origin.x, 0.07f, -1280, 1280);
-		ImGui::DragFloat3("Segment diff", &segment.diff.x, 0.07f, -1280, 1280);
+		ImGui::DragFloat3("triangle.v2", &triangle.vertices[2].x, 0.07f, -1280, 1280);*/
+		ImGui::DragFloat3("sphere1.position", &sphere1.center.x, 0.07f, -1280, 1280);
+		/*ImGui::DragFloat3("sphere2.position", &sphere2.center.x, 0.07f, 0, 1280);*/
+		/*ImGui::DragFloat3("Segment origin", &segment.origin.x, 0.07f, -1280, 1280);
+		ImGui::DragFloat3("Segment diff", &segment.diff.x, 0.07f, -1280, 1280);*/
 		/*ImGui::InputFloat3("Project", &project.x, "%.3f", ImGuiInputTextFlags_ReadOnly);
 		ImGui::DragFloat3("normal", &plane.normal.x, 0.07f, -1, 1);
 		ImGui::DragFloat("distance", &plane.distance, 0.07f, 0, 1280);*/
