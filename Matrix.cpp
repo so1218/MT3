@@ -15,6 +15,11 @@ Matrix4x4 Multiply(const Matrix4x4& m1, const Matrix4x4& m2) {
 	return result;
 }
 
+Matrix4x4 Matrix4x4::operator*(const Matrix4x4& other) const
+{
+	return Multiply(*this, other);
+}
+
 Matrix4x4 MakeIdentityMatrix() {
 	Matrix4x4 result{};
 	result.m[0][0] = 1.0f;
