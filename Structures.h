@@ -16,6 +16,30 @@ struct Vector3
 	float y;
 	float z;
 
+	Vector3& operator+=(const Vector3& other)
+	{
+		x += other.x;
+		y += other.y;
+		z += other.z;
+		return *this;
+	}
+
+	Vector3& operator-=(const Vector3& other)
+	{
+		x -= other.x;
+		y -= other.y;
+		z -= other.z;
+		return *this;
+	}
+
+	Vector3& operator*=(float scalar)
+	{
+		x *= scalar;
+		y *= scalar;
+		z *= scalar;
+		return *this;
+	}
+
 	Vector3 operator+(const Vector3& other) const
 	{
 		return Vector3{ x + other.x, y + other.y, z + other.z };
@@ -29,6 +53,11 @@ struct Vector3
 	Vector3 operator*(float scalar) const
 	{
 		return Vector3(x * scalar, y * scalar, z * scalar);
+	}
+
+	Vector3 operator/(float scalar) const
+	{
+		return scalar != 0 ? Vector3(x / scalar, y / scalar, z / scalar) : Vector3(0, 0, 0);
 	}
 
 	Vector3 Normalize() const
@@ -47,6 +76,10 @@ struct Vector3
 	}
 
 };
+
+inline Vector3 operator*(float scalar, const Vector3& vec) {
+	return Vector3{ vec.x * scalar, vec.y * scalar, vec.z * scalar };
+}
 
 inline float Dot(const Vector3& a, const Vector3& b)
 {
@@ -126,4 +159,23 @@ struct AABB
 	Vector3 min;
 	Vector3 max;
 	uint32_t color;
+};
+
+struct Spring
+{
+	// アンカー。固定された端の位置
+	Vector3 anchor;
+	float naturalLength; // 自然長
+	float stiffness; // ばね定数。剛性
+	float dampingCoefficient; // 減衰係数
+};
+
+struct Ball
+{
+	Vector3 position; // 位置
+	Vector3 velocity; // 速度
+	Vector3 acceleration; // 加速度
+	float mass; // 質量
+	float radius; // 半径
+	unsigned int color; // 色
 };
