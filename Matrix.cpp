@@ -319,3 +319,15 @@ Matrix4x4 MakeViewportMatrix(float left, float top, float width, float height, f
 
 	return matrix;
 }
+
+Vector3 WorldToScreen(const Vector3& worldPos, const Matrix4x4& WVPMatrix, float screenWidth, float screenHeight) {
+	Vector3 clipPos = Transform(worldPos, WVPMatrix);
+
+	// NDC → Screen
+	Vector3 screenPos;
+	screenPos.x = (clipPos.x + 1.0f) * 0.5f * screenWidth;
+	screenPos.y = (1.0f - clipPos.y) * 0.5f * screenHeight;
+	screenPos.z = clipPos.z;
+
+	return screenPos;
+}

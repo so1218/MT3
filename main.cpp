@@ -12,17 +12,6 @@
 
 const char kWindowTitle[] = "LE2A_12_ホリ_ソウヘイ_タイトル";
 
-Vector3 WorldToScreen(const Vector3& worldPos, const Matrix4x4& WVPMatrix, float screenWidth, float screenHeight) {
-	Vector3 clipPos = Transform(worldPos, WVPMatrix);
-
-	// NDC → Screen
-	Vector3 screenPos;
-	screenPos.x = (clipPos.x + 1.0f) * 0.5f * screenWidth;
-	screenPos.y = (1.0f - clipPos.y) * 0.5f * screenHeight;
-	screenPos.z = clipPos.z;
-
-	return screenPos;
-}
 
 // Windowsアプリでのエントリーポイント(main関数)
 int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
@@ -146,6 +135,13 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	pendulum.angularAcceleration = 0.0f;
 	bool isPendulum = false;
 
+	ConicalPendulum conicalPendulum;
+	conicalPendulum.anchor = { 0.0f,1.0f,0.0f };
+	conicalPendulum.length = 0.8f;
+	conicalPendulum.halfApexAngle = 0.7f; 
+	conicalPendulum.angle = 0.0f;
+	conicalPendulum.angularVelocity = 0.0f;
+
 	// ウィンドウの×ボタンが押されるまでループ
 	while (Novice::ProcessMessage() == 0) {
 		// フレームの開始
@@ -168,7 +164,6 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		}
 		if (keys[DIK_A]) {
 			cameraTranslate.x -= moveSpeed;
-
 		}
 		if (keys[DIK_D]) {
 			cameraTranslate.x += moveSpeed;
@@ -251,14 +246,23 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		// 球の円運動の更新処理
 		if (isPendulum)
 		{
-			pendulum.angularAcceleration =
+			/*pendulum.angularAcceleration =
 				-9.8f / pendulum.length * std::sin(pendulum.angle);
 			pendulum.angularVelocity += pendulum.angularAcceleration * deltaTime;
-			pendulum.angle += pendulum.angularVelocity * deltaTime;
+			pendulum.angle += pendulum.angularVelocity * deltaTime;*/
+
+			conicalPendulum.angularVelocity = std::sqrt(9.8f / (pendulum.length * std::cos(conicalPendulum.halfApexAngle)));
+			conicalPendulum.angle += conicalPendulum.angularVelocity * deltaTime;
 		}
-		sphereCircle.center.x = pendulum.anchor.x + std::sin(pendulum.angle) * pendulum.length;
+		/*sphereCircle.center.x = pendulum.anchor.x + std::sin(pendulum.angle) * pendulum.length;
 		sphereCircle.center.y = pendulum.anchor.y - std::cos(pendulum.angle) * pendulum.length;
-		sphereCircle.center.z = pendulum.anchor.z;
+		sphereCircle.center.z = pendulum.anchor.z;*/
+
+		float radius = conicalPendulum.length * std::sin(conicalPendulum.halfApexAngle);
+		float height = conicalPendulum.length * std::cos(conicalPendulum.halfApexAngle);
+		sphereCircle.center.x = conicalPendulum.anchor.x + std::cos(conicalPendulum.angle) * radius;
+		sphereCircle.center.y = conicalPendulum.anchor.y - height;
+		sphereCircle.center.z = conicalPendulum.anchor.z - std::sin(conicalPendulum.angle) * radius;
 
 		Vector3 sphereCircleScreen = WorldToScreen(sphereCircle.center, worldViewProjectionMatrix, 1280.0f, 720.0f);
 		Vector3 pendulumAnchorScreen = WorldToScreen(pendulum.anchor, worldViewProjectionMatrix, 1280.0f, 720.0f);
