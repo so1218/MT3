@@ -107,6 +107,34 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		{1.0f,1.0f,1.0f},
 	};
 
+	Vector3 a{ 0.2f,1.0f,0.0f };
+	Vector3 b{ 2.4f,3.1f,1.2f };
+	Vector3 c = a + b;
+	Vector3 d = a - b;
+	Vector3 e = a * 2.4f;
+	Vector3 rotateVec{ 0.4f,1.43f,-0.8f };
+	Matrix4x4 rotateXMatrix = MakeRotateXMatrix(rotateVec.x);
+	Matrix4x4 rotateYMatrix = MakeRotateYMatrix(rotateVec.y);
+	Matrix4x4 rotateZMatrix = MakeRotateZMatrix(rotateVec.z);
+	Matrix4x4 rotateMatrix = rotateXMatrix * rotateYMatrix * rotateZMatrix;
+
+	bool isSpring = false;
+	Spring spring{};
+	spring.anchor = { 0.0f,0.0f,0.0f };
+	spring.naturalLength = 1.0f; // 自然長
+	spring.stiffness = 100.0f; // ばね定数
+	spring.dampingCoefficient = 2.0f;
+
+	Ball ball{};
+	ball.position = { 1.2f, 0.0f, 0.0f };
+	ball.mass = 2.0f;
+	ball.radius = 0.05f;
+	ball.color = BLUE;
+
+	Sphere SphereBall{ ball.position,0.1f };
+
+	float deltaTime = 1.0f / 60.0f;
+
 	// ウィンドウの×ボタンが押されるまでループ
 	while (Novice::ProcessMessage() == 0) {
 		// フレームの開始
@@ -177,68 +205,38 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		Vector3 start = Transform(Transform(segment.origin, worldViewProjectionMatrix), viewportMatrix);
 		Vector3 end = Transform(Transform(segmentTrueEnd, worldViewProjectionMatrix), viewportMatrix); // 修正後
 
-		sphere1.color = WHITE;
-		/*if (isCollision(sphere1, sphere2))
-		{
-			sphere1.color = RED;
-		}
-		else
-		{
-			sphere1.color = BLACK;
-		}*/
-		plane.normal = Normalize(plane.normal);
-		/*if (IsCollision(sphere1, plane))
-		{
-			sphere1.color = RED;
-		}*/
-
-		if (IsCollision(aabb1, segment))
-		{
-			aabb1.color = RED;
-		}
-		else
-		{
-			aabb1.color = WHITE;
-		}
-
-	/*	if (IsCollision(triangle, segment))
-		{
-			segment.color = RED;
-		}
-		else
-		{
-			segment.color = WHITE;
-		}
-
-		if (IsCollision(aabb1, sphere1))
-		{
-			aabb1.color = RED;
-		}
-		else
-		{
-			aabb1.color = WHITE;
-		}*/
-
-		Vector3 centerShoulderWorld = Transform({ 0, 0, 0 }, worldMatrixShoulder);
-		Vector3 centerElbowWorld = Transform({ 0, 0, 0 }, worldMatrixElbow);
-		Vector3 centerHandWorld = Transform({ 0, 0, 0 }, worldMatrixHand);
-
 		// スクリーン座標に変換
 		Vector3 shoulderScreen = WorldToScreen(sphere1.center, WVPMatrixShoulder, 1280.0f, 720.0f);
 		Vector3 elbowScreen = WorldToScreen(sphere2.center, WVPMatrixElbow, 1280.0f, 720.0f);
 		Vector3 handScreen = WorldToScreen(sphere3.center, WVPMatrixHand, 1280.0f, 720.0f);
+		
+		if (isSpring)
+		{
+			// ばねの更新処理
+			Vector3 diff = ball.position - spring.anchor;
+			float length = Length(diff);
+			if (length != 0.0f)
+			{
+				Vector3 direction = Normalize(diff);
+				Vector3 restPosition = spring.anchor + direction * spring.naturalLength;
+				Vector3 displacement = length * (ball.position - restPosition);
+				Vector3 restoringForce = -spring.stiffness * displacement;
+				// 減衰力の計算
+				Vector3 dampingForce = -spring.dampingCoefficient * ball.velocity;
+				Vector3 force = restoringForce + dampingForce;
+				ball.acceleration = force / ball.mass;
+			}
 
-		Vector3 a{ 0.2f,1.0f,0.0f };
-		Vector3 b{ 2.4f,3.1f,1.2f };
-		Vector3 c = a + b;
-		Vector3 d = a - b;
-		Vector3 e = a * 2.4f;
-		Vector3 rotateVec{ 0.4f,1.43f,-0.8f };
-		Matrix4x4 rotateXMatrix = MakeRotateXMatrix(rotateVec.x);
-		Matrix4x4 rotateYMatrix = MakeRotateYMatrix(rotateVec.y);
-		Matrix4x4 rotateZMatrix = MakeRotateZMatrix(rotateVec.z);
-		Matrix4x4 rotateMatrix = rotateXMatrix * rotateYMatrix * rotateZMatrix;
+			// 加速度も速度もどちらも秒が基準
+			ball.velocity += ball.acceleration * deltaTime;
+			ball.position += ball.velocity * deltaTime;
+		}
 
+		SphereBall.center = ball.position;
+
+		Vector3 ballScreen = WorldToScreen(SphereBall.center, worldViewProjectionMatrix, 1280.0f, 720.0f);
+		Vector3 anchorScreen = WorldToScreen(spring.anchor, worldViewProjectionMatrix, 1280.0f, 720.0f);
+		
 		///
 		/// ↑更新処理ここまで
 		///
@@ -248,13 +246,16 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		///
 
 		DrawGrid(worldViewProjectionMatrix, viewportMatrix);
-		DrawSphere(sphere1, WVPMatrixShoulder, viewportMatrix, RED);
+		/*DrawSphere(sphere1, WVPMatrixShoulder, viewportMatrix, RED);
 		DrawSphere(sphere2, WVPMatrixElbow, viewportMatrix, GREEN);
-		DrawSphere(sphere3, WVPMatrixHand, viewportMatrix, BLUE);
-		Novice::DrawLine((int)shoulderScreen.x, (int)shoulderScreen.y,
+		DrawSphere(sphere3, WVPMatrixHand, viewportMatrix, BLUE);*/
+		DrawSphere(SphereBall, worldViewProjectionMatrix, viewportMatrix, RED);
+		Novice::DrawLine((int)anchorScreen.x, (int)anchorScreen.y,
+			(int)ballScreen.x, (int)ballScreen.y, WHITE);
+		/*Novice::DrawLine((int)shoulderScreen.x, (int)shoulderScreen.y,
 			(int)elbowScreen.x, (int)elbowScreen.y, WHITE);
 		Novice::DrawLine((int)elbowScreen.x, (int)elbowScreen.y,
-			(int)handScreen.x, (int)handScreen.y, WHITE);
+			(int)handScreen.x, (int)handScreen.y, WHITE);*/
 		/*Novice::DrawLine(int(start.x), int(start.y), int(end.x), int(end.y), segment.color);*/
 		/*DrawPlane(plane, worldViewProjectionMatrix, viewportMatrix, BLACK);*/
 		/*DrawTriangle(triangle, worldViewProjectionMatrix, viewportMatrix, WHITE);*/
@@ -305,7 +306,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		ImGui::DragFloat3("cameraRotate", &cameraRotate.x, 0.07f, -10, 10);
 		ImGui::DragFloat3("cameraTranslate", &cameraTranslate.x, 0.07f, -1280, 1280);*/
 
-		ImGui::Text("c:%f, %f, %f", c.x, c.y, c.z);
+		/*ImGui::Text("c:%f, %f, %f", c.x, c.y, c.z);
 		ImGui::Text("d:%f, %f, %f", d.x, d.y, d.z);
 		ImGui::Text("e:%f, %f, %f", e.x, e.y, e.z);
 		ImGui::Text(
@@ -314,7 +315,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			rotateMatrix.m[1][0], rotateMatrix.m[1][1], rotateMatrix.m[1][2], rotateMatrix.m[1][3],
 			rotateMatrix.m[2][0], rotateMatrix.m[2][1], rotateMatrix.m[2][2], rotateMatrix.m[2][3],
 			rotateMatrix.m[3][0], rotateMatrix.m[3][1], rotateMatrix.m[3][2], rotateMatrix.m[3][3]
-			);
+			);*/
+
+		ImGui::Checkbox("Start", &isSpring);
 
 		ImGui::End();
 

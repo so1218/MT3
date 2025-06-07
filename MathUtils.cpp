@@ -79,3 +79,7 @@ Vector3 Lerp(const Vector3& v1, const Vector3& v2, float t)
 		v1.z + (v2.z - v1.z) * t
 	};
 }
+
+float Length(const Vector3& v) {
+	return std::sqrt(v.x * v.x + v.y * v.y + v.z * v.z);
+}

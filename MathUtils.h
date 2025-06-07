@@ -12,4 +12,5 @@ Vector3 Perpendicular(const Vector3& vector);
 Vector3 Subtract(const Vector3& v1, const Vector3& v2);
 Vector3 Add(const Vector3& v1, const Vector3& v2);
 Vector3 Lerp(const Vector3& v1, const Vector3& v2, float t);
+float Length(const Vector3& v);
 
