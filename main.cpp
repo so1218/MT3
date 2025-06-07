@@ -12,6 +12,18 @@
 
 const char kWindowTitle[] = "LE2A_12_ホリ_ソウヘイ_タイトル";
 
+Vector3 WorldToScreen(const Vector3& worldPos, const Matrix4x4& WVPMatrix, float screenWidth, float screenHeight) {
+	Vector3 clipPos = Transform(worldPos, WVPMatrix);
+
+	// NDC → Screen
+	Vector3 screenPos;
+	screenPos.x = (clipPos.x + 1.0f) * 0.5f * screenWidth;
+	screenPos.y = (1.0f - clipPos.y) * 0.5f * screenHeight;
+	screenPos.z = clipPos.z;
+
+	return screenPos;
+}
+
 // Windowsアプリでのエントリーポイント(main関数)
 int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
@@ -37,8 +49,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	Segment segment;
 	segment.origin = { -1.12f, 0.12f, -1.33f };
 	segment.diff = { -1.12f, 0.58f, 0.14f };
-	Vector3 center1{ 1.160f,0.6f,-1.290f };
-	Vector3 center2{ 1.0f,0.6f,0.6f };
+	Vector3 center1{ 0.0f,0.0f,0.0f };
+	Vector3 center2{ 0.0f,0.0f,0.0f };
+	Vector3 center3{ 0.0f,0.0f,0.0f };
 
 	Vector3 project = Project(Subtract(center1, segment.origin), segment.diff);
 	Vector3 closestPoint = CrosestPoint(center1, segment);
@@ -46,8 +59,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	// 速度
 	const float moveSpeed = 0.1f;
 
-	Sphere sphere1{ center1,0.4f };// 1cmの球を描画
-	Sphere sphere2{ center2,0.4f };
+	Sphere sphere1{ center1,0.1f };
+	Sphere sphere2{ center2,0.1f };
+	Sphere sphere3{ center3,0.1f };
 
 	Plane plane{ {0,1,0},1 };
 
@@ -72,6 +86,25 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		{ -0.8f, 0.58f, 1.0f },
 		{ 1.76f, 1.0f, -0.3f },
 		{ 0.94f, -0.7f, 2.3f }
+	};
+
+	Vector3 translates[3] =
+	{
+		{0.2f,1.0f,0.0f} ,
+		{0.4f,0.0f,0.0f},
+		{0.3f,0.0f,0.0f},
+	};
+	Vector3 rotates[3] =
+	{
+		{0.0f,0.0f,-0.8f} ,
+		{0.0f,0.0f,-1.4f},
+		{0.0f,0.0f,0.0f},
+	};
+	Vector3 scales[3] =
+	{
+		{1.0f,1.0f,1.0f} ,
+		{1.0f,1.0f,1.0f},
+		{1.0f,1.0f,1.0f},
 	};
 
 	// ウィンドウの×ボタンが押されるまでループ
@@ -118,6 +151,25 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 		// ViewportMatrixを作る
 		Matrix4x4 viewportMatrix = MakeViewportMatrix(0, 0, 1280, 720, 0.0f, 1.0f);
+
+		// 肩のローカル変形
+		Matrix4x4 localMatrixShoulder = MakeAffineMatrix(scales[0], rotates[0], translates[0]);
+		// 肩のワールド行列
+		Matrix4x4 worldMatrixShoulder = localMatrixShoulder;
+		// ひじのローカル変形
+		Matrix4x4 localMatrixElbow = MakeAffineMatrix(scales[1], rotates[1], translates[1]);
+		// ひじのワールド行列
+		Matrix4x4 worldMatrixElbow = Multiply(localMatrixElbow, worldMatrixShoulder);
+		// 手のローカル変形
+		Matrix4x4 localMatrixHand = MakeAffineMatrix(scales[2], rotates[2], translates[2]);
+		// 手のワールド行列
+		Matrix4x4 worldMatrixHand = Multiply(localMatrixHand, worldMatrixElbow);
+
+		// WVPMatrixを作る
+		Matrix4x4 WVPMatrixShoulder = Multiply(Multiply(worldMatrixShoulder, viewMatrix), projectionMatrix);
+		Matrix4x4 WVPMatrixElbow = Multiply(Multiply(worldMatrixElbow, viewMatrix), projectionMatrix);
+		Matrix4x4 WVPMatrixHand = Multiply(Multiply(worldMatrixHand, viewMatrix), projectionMatrix);
+		
 		// 線の終点を計算する
 		Vector3 segmentTrueEnd = Add(segment.origin, segment.diff);
 
@@ -167,6 +219,14 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			aabb1.color = WHITE;
 		}*/
 
+		Vector3 centerShoulderWorld = Transform({ 0, 0, 0 }, worldMatrixShoulder);
+		Vector3 centerElbowWorld = Transform({ 0, 0, 0 }, worldMatrixElbow);
+		Vector3 centerHandWorld = Transform({ 0, 0, 0 }, worldMatrixHand);
+
+		// スクリーン座標に変換
+		Vector3 shoulderScreen = WorldToScreen(sphere1.center, WVPMatrixShoulder, 1280.0f, 720.0f);
+		Vector3 elbowScreen = WorldToScreen(sphere2.center, WVPMatrixElbow, 1280.0f, 720.0f);
+		Vector3 handScreen = WorldToScreen(sphere3.center, WVPMatrixHand, 1280.0f, 720.0f);
 		///
 		/// ↑更新処理ここまで
 		///
@@ -177,15 +237,20 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		///
 
 		DrawGrid(worldViewProjectionMatrix, viewportMatrix);
-		/*DrawSphere(sphere1, worldViewProjectionMatrix, viewportMatrix, sphere1.color);*/
-		/*DrawSphere(sphere2, worldViewProjectionMatrix, viewportMatrix, BLACK);*/
+		DrawSphere(sphere1, WVPMatrixShoulder, viewportMatrix, RED);
+		DrawSphere(sphere2, WVPMatrixElbow, viewportMatrix, GREEN);
+		DrawSphere(sphere3, WVPMatrixHand, viewportMatrix, BLUE);
+		Novice::DrawLine((int)shoulderScreen.x, (int)shoulderScreen.y,
+			(int)elbowScreen.x, (int)elbowScreen.y, WHITE);
+		Novice::DrawLine((int)elbowScreen.x, (int)elbowScreen.y,
+			(int)handScreen.x, (int)handScreen.y, WHITE);
 		/*Novice::DrawLine(int(start.x), int(start.y), int(end.x), int(end.y), segment.color);*/
 		/*DrawPlane(plane, worldViewProjectionMatrix, viewportMatrix, BLACK);*/
 		/*DrawTriangle(triangle, worldViewProjectionMatrix, viewportMatrix, WHITE);*/
 		/*DrawAABB(aabb1, worldViewProjectionMatrix, viewportMatrix, aabb1.color);*/
 		/*DrawAABB(aabb2, worldViewProjectionMatrix, viewportMatrix, WHITE);*/
-		DrawBezierCurve(controlPoints[0], controlPoints[1], controlPoints[2],
-			worldViewProjectionMatrix, viewportMatrix, WHITE);
+		/*DrawBezierCurve(controlPoints[0], controlPoints[1], controlPoints[2],
+			worldViewProjectionMatrix, viewportMatrix, WHITE);*/
 		ImGui::Begin("MyWindow");
 		/*ImGui::DragFloat3("aabb1.min", &aabb1.min.x, 0.07f, -1280, 1280);
 		ImGui::DragFloat3("aabb1.max", &aabb1.max.x, 0.07f, -1280, 1280);*/
@@ -213,9 +278,18 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		/*ImGui::InputFloat3("Project", &project.x, "%.3f", ImGuiInputTextFlags_ReadOnly);
 		ImGui::DragFloat3("normal", &plane.normal.x, 0.07f, -1, 1);
 		ImGui::DragFloat("distance", &plane.distance, 0.07f, 0, 1280);*/
-		ImGui::DragFloat3("controlPoints[0]", &controlPoints[0].x, 0.07f, -1280, 1280);
+		/*ImGui::DragFloat3("controlPoints[0]", &controlPoints[0].x, 0.07f, -1280, 1280);
 		ImGui::DragFloat3("controlPoints[1]", &controlPoints[1].x, 0.07f, -1280, 1280);
-		ImGui::DragFloat3("controlPoints[2]", &controlPoints[2].x, 0.07f, -1280, 1280);
+		ImGui::DragFloat3("controlPoints[2]", &controlPoints[2].x, 0.07f, -1280, 1280);*/
+		ImGui::DragFloat3("translates[0]", &translates[0].x, 0.07f, -1280, 1280);
+		ImGui::DragFloat3("rotates[0]", &rotates[0].x, 0.07f, -1280, 1280);
+		ImGui::DragFloat3("scales[0]", &scales[0].x, 0.07f, -1280, 1280);
+		ImGui::DragFloat3("translates[1]", &translates[1].x, 0.07f, -1280, 1280);
+		ImGui::DragFloat3("rotates[1]", &rotates[1].x, 0.07f, -1280, 1280);
+		ImGui::DragFloat3("scales[1]", &scales[1].x, 0.07f, -1280, 1280);
+		ImGui::DragFloat3("translates[2]", &translates[2].x, 0.07f, -1280, 1280);
+		ImGui::DragFloat3("rotates[2]", &rotates[2].x, 0.07f, -1280, 1280);
+		ImGui::DragFloat3("scales[2]", &scales[2].x, 0.07f, -1280, 1280);
 		ImGui::DragFloat3("cameraScale", &cameraScale.x, 0.07f, 0, 10);
 		ImGui::DragFloat3("cameraRotate", &cameraRotate.x, 0.07f, -10, 10);
 		ImGui::DragFloat3("cameraTranslate", &cameraTranslate.x, 0.07f, -1280, 1280);
