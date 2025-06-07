@@ -204,3 +204,10 @@ bool IsCollision(const Sphere& s1, const Sphere& s2)
 
 	return dx * dx + dy * dy + dz * dz <= radiusSum * radiusSum;
 }
+
+bool IsCollision(const Sphere& ball, const Capsule& capsule)
+{
+	Vector3 closest = ClosestPointOnSegment(ball.center, capsule.segment);
+	float distance = Length(ball.center - closest);
+	return distance <= (ball.radius + capsule.radius);
+}

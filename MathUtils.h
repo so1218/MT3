@@ -13,4 +13,5 @@ Vector3 Subtract(const Vector3& v1, const Vector3& v2);
 Vector3 Add(const Vector3& v1, const Vector3& v2);
 Vector3 Lerp(const Vector3& v1, const Vector3& v2, float t);
 float Length(const Vector3& v);
-
+Vector3 Reflect(const Vector3& input, const Vector3& normal);
+Vector3 ClosestPointOnSegment(const Vector3& p, const Segment& seg);

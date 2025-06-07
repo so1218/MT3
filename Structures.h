@@ -197,3 +197,9 @@ struct ConicalPendulum
 	float angle; // 現在の角度
 	float angularVelocity; // 角速度ω
 };
+
+struct Capsule
+{
+	Segment segment;
+	float radius;
+};

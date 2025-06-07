@@ -83,3 +83,23 @@ Vector3 Lerp(const Vector3& v1, const Vector3& v2, float t)
 float Length(const Vector3& v) {
 	return std::sqrt(v.x * v.x + v.y * v.y + v.z * v.z);
 }
+
+Vector3 Reflect(const Vector3& input, const Vector3& normal)
+{
+	float dot = Vector3::Dot(input, normal);
+	return {
+		input.x - 2.0f * dot * normal.x,
+		input.y - 2.0f * dot * normal.y,
+		input.z - 2.0f * dot * normal.z
+	};
+}
+
+Vector3 ClosestPointOnSegment(const Vector3& p, const Segment& seg)
+{
+	Vector3 a = seg.origin;
+	Vector3 b = seg.origin + seg.diff;
+	Vector3 ab = b - a;
+	float t = Vector3::Dot(p - a, ab) / Vector3::Dot(ab, ab);
+	t = std::clamp(t, 0.0f, 1.0f);
+	return a + ab * t;
+}
