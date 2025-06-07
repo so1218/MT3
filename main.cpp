@@ -133,6 +133,13 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 	Sphere SphereBall{ ball.position,0.1f };
 
+	Sphere sphereCircle{ {0,0,0},0.1f};
+	Vector3 circleCenter{ 0.0f,0.0f,0.0f };
+	float angularVelocity = 3.14f;
+	float angle = 0.0f;
+	float circleRadius = 0.8f;
+	bool isMoveCircle = false;
+
 	float deltaTime = 1.0f / 60.0f;
 
 	// ウィンドウの×ボタンが押されるまでループ
@@ -236,6 +243,15 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 		Vector3 ballScreen = WorldToScreen(SphereBall.center, worldViewProjectionMatrix, 1280.0f, 720.0f);
 		Vector3 anchorScreen = WorldToScreen(spring.anchor, worldViewProjectionMatrix, 1280.0f, 720.0f);
+
+		// 球の円運動の更新処理
+		if (isMoveCircle)
+		{
+			angle += angularVelocity * deltaTime; // 角度を更新
+		}
+		sphereCircle.center.x = circleCenter.x + std::cos(angle) * circleRadius;
+		sphereCircle.center.y = circleCenter.y + std::sin(angle) * circleRadius;
+		sphereCircle.center.z = circleCenter.z;
 		
 		///
 		/// ↑更新処理ここまで
@@ -249,9 +265,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		/*DrawSphere(sphere1, WVPMatrixShoulder, viewportMatrix, RED);
 		DrawSphere(sphere2, WVPMatrixElbow, viewportMatrix, GREEN);
 		DrawSphere(sphere3, WVPMatrixHand, viewportMatrix, BLUE);*/
-		DrawSphere(SphereBall, worldViewProjectionMatrix, viewportMatrix, RED);
+		/*DrawSphere(SphereBall, worldViewProjectionMatrix, viewportMatrix, RED);
 		Novice::DrawLine((int)anchorScreen.x, (int)anchorScreen.y,
-			(int)ballScreen.x, (int)ballScreen.y, WHITE);
+			(int)ballScreen.x, (int)ballScreen.y, WHITE);*/
+		DrawSphere(sphereCircle, worldViewProjectionMatrix, viewportMatrix, RED);
 		/*Novice::DrawLine((int)shoulderScreen.x, (int)shoulderScreen.y,
 			(int)elbowScreen.x, (int)elbowScreen.y, WHITE);
 		Novice::DrawLine((int)elbowScreen.x, (int)elbowScreen.y,
@@ -317,7 +334,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			rotateMatrix.m[3][0], rotateMatrix.m[3][1], rotateMatrix.m[3][2], rotateMatrix.m[3][3]
 			);*/
 
-		ImGui::Checkbox("Start", &isSpring);
+		ImGui::Checkbox("Start", &isMoveCircle);
 
 		ImGui::End();
 
