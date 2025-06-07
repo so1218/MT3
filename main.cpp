@@ -52,7 +52,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	Sphere sphere2{ center2,0.1f };
 	Sphere sphere3{ center3,0.1f };
 
-	Plane plane{ {0,1,0},1 };
+	Plane plane{ {-0.2f,0.9f,-0.3f},0 };
+	plane.normal = Normalize(plane.normal); 
 
 	Triangle triangle;
 	triangle.vertices[0] = { 0, 0, 1 };
@@ -100,7 +101,6 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	Vector3 b{ 2.4f,3.1f,1.2f };
 	Vector3 c = a + b;
 	Vector3 d = a - b;
-	Vector3 e = a * 2.4f;
 	Vector3 rotateVec{ 0.4f,1.43f,-0.8f };
 	Matrix4x4 rotateXMatrix = MakeRotateXMatrix(rotateVec.x);
 	Matrix4x4 rotateYMatrix = MakeRotateYMatrix(rotateVec.y);
@@ -141,6 +141,21 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	conicalPendulum.halfApexAngle = 0.7f; 
 	conicalPendulum.angle = 0.0f;
 	conicalPendulum.angularVelocity = 0.0f;
+
+	Ball reflectBall{};
+	reflectBall.position = { 0.8f, 1.2f, 0.3f };
+	reflectBall.acceleration = { 0.0f, -9.8f, 0.0f };
+	reflectBall.mass = 2.0f;
+	reflectBall.radius = 0.05f;
+	reflectBall.color = WHITE;
+	float e = 0.6f;
+	Sphere reflectSphere{ reflectBall.position,reflectBall.radius };
+	bool isReflect = false;
+	Capsule capsule;
+	capsule.segment.origin = { -5.0f, 0.0f, 0.0f };     
+	capsule.segment.diff = { 10.0f, 0.0f, 0.0f };       
+	capsule.segment.color = RED;
+	capsule.radius = 0.5f;
 
 	// ウィンドウの×ボタンが押されるまでループ
 	while (Novice::ProcessMessage() == 0) {
@@ -266,6 +281,23 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 		Vector3 sphereCircleScreen = WorldToScreen(sphereCircle.center, worldViewProjectionMatrix, 1280.0f, 720.0f);
 		Vector3 pendulumAnchorScreen = WorldToScreen(pendulum.anchor, worldViewProjectionMatrix, 1280.0f, 720.0f);
+
+		if (isReflect)
+		{
+			reflectBall.velocity += reflectBall.acceleration * deltaTime;
+			reflectBall.position += reflectBall.velocity * deltaTime;
+		}
+		if (IsCollision(Sphere{ reflectBall.position,reflectBall.radius,WHITE }, plane))
+		{
+			Vector3 closest = ClosestPointOnSegment(reflectBall.position, capsule.segment);
+			Vector3 normal = Normalize(plane.normal);
+			Vector3 reflected = Reflect(reflectBall.velocity, normal);
+			Vector3 projectToNormal = Project(reflected, normal);
+			Vector3 movingDirection = reflected - projectToNormal;
+			reflectBall.velocity = projectToNormal * e + movingDirection;
+		}
+
+		reflectSphere.center = reflectBall.position;
 		
 		///
 		/// ↑更新処理ここまで
@@ -282,15 +314,16 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		/*DrawSphere(SphereBall, worldViewProjectionMatrix, viewportMatrix, RED);
 		Novice::DrawLine((int)anchorScreen.x, (int)anchorScreen.y,
 			(int)ballScreen.x, (int)ballScreen.y, WHITE);*/
-		DrawSphere(sphereCircle, worldViewProjectionMatrix, viewportMatrix, RED);
+		/*DrawSphere(sphereCircle, worldViewProjectionMatrix, viewportMatrix, RED);
 		Novice::DrawLine((int)pendulumAnchorScreen.x, (int)pendulumAnchorScreen.y,
-			(int)sphereCircleScreen.x, (int)sphereCircleScreen.y, WHITE);
+			(int)sphereCircleScreen.x, (int)sphereCircleScreen.y, WHITE);*/
 		/*Novice::DrawLine((int)shoulderScreen.x, (int)shoulderScreen.y,
 			(int)elbowScreen.x, (int)elbowScreen.y, WHITE);
 		Novice::DrawLine((int)elbowScreen.x, (int)elbowScreen.y,
 			(int)handScreen.x, (int)handScreen.y, WHITE);*/
 		/*Novice::DrawLine(int(start.x), int(start.y), int(end.x), int(end.y), segment.color);*/
-		/*DrawPlane(plane, worldViewProjectionMatrix, viewportMatrix, BLACK);*/
+		DrawSphere(reflectSphere, worldViewProjectionMatrix, viewportMatrix, RED);
+		DrawPlane(plane, worldViewProjectionMatrix, viewportMatrix, BLACK);
 		/*DrawTriangle(triangle, worldViewProjectionMatrix, viewportMatrix, WHITE);*/
 		/*DrawAABB(aabb1, worldViewProjectionMatrix, viewportMatrix, aabb1.color);*/
 		/*DrawAABB(aabb2, worldViewProjectionMatrix, viewportMatrix, WHITE);*/
@@ -350,7 +383,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			rotateMatrix.m[3][0], rotateMatrix.m[3][1], rotateMatrix.m[3][2], rotateMatrix.m[3][3]
 			);*/
 
-		ImGui::Checkbox("Start", &isPendulum);
+		ImGui::Checkbox("Start", &isReflect);
 
 		ImGui::End();
 
