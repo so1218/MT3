@@ -135,12 +135,16 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 	Sphere sphereCircle{ {0,0,0},0.1f};
 	Vector3 circleCenter{ 0.0f,0.0f,0.0f };
-	float angularVelocity = 3.14f;
-	float angle = 0.0f;
-	float circleRadius = 0.8f;
-	bool isMoveCircle = false;
-
+	
 	float deltaTime = 1.0f / 60.0f;
+
+	Pendulum pendulum;
+	pendulum.anchor = { 0.0f,1.0f,0.0f };
+	pendulum.length = 0.8f;
+	pendulum.angle = 0.7f;
+	pendulum.angularVelocity = 0.0f;
+	pendulum.angularAcceleration = 0.0f;
+	bool isPendulum = false;
 
 	// ウィンドウの×ボタンが押されるまでループ
 	while (Novice::ProcessMessage() == 0) {
@@ -245,13 +249,19 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		Vector3 anchorScreen = WorldToScreen(spring.anchor, worldViewProjectionMatrix, 1280.0f, 720.0f);
 
 		// 球の円運動の更新処理
-		if (isMoveCircle)
+		if (isPendulum)
 		{
-			angle += angularVelocity * deltaTime; // 角度を更新
+			pendulum.angularAcceleration =
+				-9.8f / pendulum.length * std::sin(pendulum.angle);
+			pendulum.angularVelocity += pendulum.angularAcceleration * deltaTime;
+			pendulum.angle += pendulum.angularVelocity * deltaTime;
 		}
-		sphereCircle.center.x = circleCenter.x + std::cos(angle) * circleRadius;
-		sphereCircle.center.y = circleCenter.y + std::sin(angle) * circleRadius;
-		sphereCircle.center.z = circleCenter.z;
+		sphereCircle.center.x = pendulum.anchor.x + std::sin(pendulum.angle) * pendulum.length;
+		sphereCircle.center.y = pendulum.anchor.y - std::cos(pendulum.angle) * pendulum.length;
+		sphereCircle.center.z = pendulum.anchor.z;
+
+		Vector3 sphereCircleScreen = WorldToScreen(sphereCircle.center, worldViewProjectionMatrix, 1280.0f, 720.0f);
+		Vector3 pendulumAnchorScreen = WorldToScreen(pendulum.anchor, worldViewProjectionMatrix, 1280.0f, 720.0f);
 		
 		///
 		/// ↑更新処理ここまで
@@ -269,6 +279,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		Novice::DrawLine((int)anchorScreen.x, (int)anchorScreen.y,
 			(int)ballScreen.x, (int)ballScreen.y, WHITE);*/
 		DrawSphere(sphereCircle, worldViewProjectionMatrix, viewportMatrix, RED);
+		Novice::DrawLine((int)pendulumAnchorScreen.x, (int)pendulumAnchorScreen.y,
+			(int)sphereCircleScreen.x, (int)sphereCircleScreen.y, WHITE);
 		/*Novice::DrawLine((int)shoulderScreen.x, (int)shoulderScreen.y,
 			(int)elbowScreen.x, (int)elbowScreen.y, WHITE);
 		Novice::DrawLine((int)elbowScreen.x, (int)elbowScreen.y,
@@ -334,7 +346,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			rotateMatrix.m[3][0], rotateMatrix.m[3][1], rotateMatrix.m[3][2], rotateMatrix.m[3][3]
 			);*/
 
-		ImGui::Checkbox("Start", &isMoveCircle);
+		ImGui::Checkbox("Start", &isPendulum);
 
 		ImGui::End();
 
