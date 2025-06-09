@@ -157,6 +157,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	capsule.segment.color = RED;
 	capsule.radius = 0.5f;
 
+	Vector3 axis = Normalize({ 1.0f,1.0f,1.0f });
+	float angle = 0.44f;
+	Matrix4x4 rotationMatrix = MakeRotateAxisAngle(axis, angle);
+
 	// ウィンドウの×ボタンが押されるまでループ
 	while (Novice::ProcessMessage() == 0) {
 		// フレームの開始
@@ -322,8 +326,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		Novice::DrawLine((int)elbowScreen.x, (int)elbowScreen.y,
 			(int)handScreen.x, (int)handScreen.y, WHITE);*/
 		/*Novice::DrawLine(int(start.x), int(start.y), int(end.x), int(end.y), segment.color);*/
-		DrawSphere(reflectSphere, worldViewProjectionMatrix, viewportMatrix, RED);
-		DrawPlane(plane, worldViewProjectionMatrix, viewportMatrix, BLACK);
+	/*	DrawSphere(reflectSphere, worldViewProjectionMatrix, viewportMatrix, RED);
+		DrawPlane(plane, worldViewProjectionMatrix, viewportMatrix, BLACK);*/
 		/*DrawTriangle(triangle, worldViewProjectionMatrix, viewportMatrix, WHITE);*/
 		/*DrawAABB(aabb1, worldViewProjectionMatrix, viewportMatrix, aabb1.color);*/
 		/*DrawAABB(aabb2, worldViewProjectionMatrix, viewportMatrix, WHITE);*/
@@ -386,6 +390,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		ImGui::Checkbox("Start", &isReflect);
 
 		ImGui::End();
+
+		MatrixScreenPrintf(0, 0, rotationMatrix, "rotateMatrix");
 
 		plane.normal = Normalize(plane.normal);
 
