@@ -331,3 +331,154 @@ Vector3 WorldToScreen(const Vector3& worldPos, const Matrix4x4& WVPMatrix, float
 
 	return screenPos;
 }
+
+Matrix4x4 MakeRotateAxisAngle(const Vector3& axis, float angle)
+{
+	Matrix4x4 matrix = {};
+	float cos = std::cos(angle);
+	float sin = std::sin(angle);
+	float t = 1.0f - cos;
+	matrix.m[0][0] = t * axis.x * axis.x + cos;
+	matrix.m[0][1] = t * axis.x * axis.y + sin * axis.z;
+	matrix.m[0][2] = t * axis.x * axis.z - sin * axis.y;
+	matrix.m[0][3] = 0.0f;
+	matrix.m[1][0] = t * axis.x * axis.y - sin * axis.z;
+	matrix.m[1][1] = t * axis.y * axis.y + cos;
+	matrix.m[1][2] = t * axis.y * axis.z + sin * axis.x;
+	matrix.m[1][3] = 0.0f;
+	matrix.m[2][0] = t * axis.x * axis.z + sin * axis.y;
+	matrix.m[2][1] = t * axis.y * axis.z - sin * axis.x;
+	matrix.m[2][2] = t * axis.z * axis.z + cos;
+	matrix.m[2][3] = 0.0f;
+	matrix.m[3][0] = 0.0f;
+	matrix.m[3][1] = 0.0f;
+	matrix.m[3][2] = 0.0f;
+	matrix.m[3][3] = 1.0f;
+	return matrix;
+}
+
+Matrix4x4 DirectionToDirection(const Vector3& from, const Vector3& to) {
+	// 1. 'from' と 'to' ベクトルを正規化します。
+	Vector3 u = Normalize(from);
+	Vector3 v = Normalize(to);
+
+	// 2. 回転軸 n を計算します。
+	Vector3 n = u.cross(v);
+	float n_length = n.length();
+
+	// 特殊なケースの処理：
+	// a) u と v が同じ方向 (u == v) の場合
+	//    回転は不要で、単位行列を返します。
+	if (n_length < 1e-6) { // n がほぼゼロベクトル、つまり u と v が平行
+		// u と v がほぼ等しい場合、単位行列を返します。
+		// u と v が逆方向 (u = -v) の場合もこの条件に該当します。
+		// 画像には「u=-vのとき、u x v = 0, u・v = -1なので、-Eとなり、反転する行列になってしまう」とあります。
+		// これに対処するため、180度回転を明示的に処理します。
+		if (Dot(u,v) < 0) { // u と v が逆方向 (ほぼ -1)
+			// 180度回転
+			// この場合、回転軸は任意（u に垂直な任意の軸）ですが、
+			// n がゼロベクトルなので、軸を見つける必要があります。
+			// 例えば、u と直交する任意のベクトルを軸として利用できます。
+			// 簡略化のために、画像を参考に180度回転の行列を構築します。
+			// 任意の軸 (u に垂直な軸) を見つける方法：
+			// 例えば、(1,0,0) と u の外積がゼロでなければそれを使う。ゼロなら (0,1,0) との外積を使う。
+			Vector3 axis;
+			if (std::abs(u.x) < 0.9f) { // x成分が小さい場合、X軸との外積が有効な軸になる可能性が高い
+				axis = Vector3(1.0f, 0.0f, 0.0f).cross(u).Normalize();
+			}
+			else { // x成分が大きい場合、Y軸との外積を使う
+				axis = Vector3(0.0f, 1.0f, 0.0f).cross(u).Normalize();
+			}
+
+			// 180度回転行列 (ロドリゲスの回転公式などから)
+			// R = I + 2 * (n n^T) - I = 2 * (n n^T) - I  (ただし、n は正規化された軸)
+			// この場合、theta = PI (180度) なので、cos(PI) = -1, sin(PI) = 0
+			// R = n n^T (1 - (-1)) + (-1)I = 2 * n n^T - I
+			// 各要素は
+			// R_ij = 2 * n_i * n_j (i != j)
+			// R_ii = 2 * n_i^2 - 1
+			float nx = axis.x;
+			float ny = axis.y;
+			float nz = axis.z;
+
+			Matrix4x4 result;
+			result.m[0][0] = 2.0f * nx * nx - 1.0f;
+			result.m[0][1] = 2.0f * nx * ny;
+			result.m[0][2] = 2.0f * nx * nz;
+			result.m[1][0] = 2.0f * ny * nx;
+			result.m[1][1] = 2.0f * ny * ny - 1.0f;
+			result.m[1][2] = 2.0f * ny * nz;
+			result.m[2][0] = 2.0f * nz * nx;
+			result.m[2][1] = 2.0f * nz * ny;
+			result.m[2][2] = 2.0f * nz * nz - 1.0f;
+
+			// 4x4 行列なので、4列目はそのまま (移動成分はなし)
+			result.m[0][3] = 0.0f;
+			result.m[1][3] = 0.0f;
+			result.m[2][3] = 0.0f;
+			result.m[3][0] = 0.0f;
+			result.m[3][1] = 0.0f;
+			result.m[3][2] = 0.0f;
+			result.m[3][3] = 1.0f;
+
+			return result;
+		}
+		// u と v がほぼ同じ方向の場合 (n_length が小さいが dot(u,v) も 0 に近い)
+		// 例えば、fromとtoがどちらもゼロベクトルのような異常なケース
+		// 通常は from.normalize() と to.normalize() で対処されるはず
+		return Matrix4x4(); // 単位行列を返す
+	}
+
+	// 3. 回転軸 n を正規化します。
+	n = Normalize(n);
+
+	// 4. cos_theta と sin_theta を計算します。
+	float cos_theta = Dot(u,v);
+	// sin_theta = n_length; // u,vが正規化されているので ||u x v|| = sin(theta)
+
+	// 浮動小数点計算の誤差により、cos_theta が [-1, 1] の範囲をわずかに超えることがあります。
+	// std::acos に渡す前にクランプします。
+	if (cos_theta > 1.0f) cos_theta = 1.0f;
+	if (cos_theta < -1.0f) cos_theta = -1.0f;
+
+	float sin_theta = std::sqrt(1.0f - cos_theta * cos_theta); // sin^2 + cos^2 = 1 より
+	// ただし、u x v の方向と、theta の方向が一致するように sin_theta の符号を考慮する必要があります。
+	// ||u x v|| は常に正なので、この計算で問題ありません。
+	// 回転の方向は軸 n と右手系で決まります。
+	// from から to への回転なので、外積 u x v はこの回転の方向を向いているはずです。
+
+	// 5. 回転行列の要素を計算します。
+	float nx = n.x;
+	float ny = n.y;
+	float nz = n.z;
+
+	float one_minus_cos_theta = 1.0f - cos_theta;
+
+	Matrix4x4 R;
+
+	// 1行目
+	R.m[0][0] = nx * nx * one_minus_cos_theta + cos_theta;
+	R.m[0][1] = nx * ny * one_minus_cos_theta + nz * sin_theta;
+	R.m[0][2] = nx * nz * one_minus_cos_theta - ny * sin_theta;
+
+	// 2行目
+	R.m[1][0] = nx * ny * one_minus_cos_theta - nz * sin_theta;
+	R.m[1][1] = ny * ny * one_minus_cos_theta + cos_theta;
+	R.m[1][2] = ny * nz * one_minus_cos_theta + nx * sin_theta;
+
+	// 3行目
+	R.m[2][0] = nx * nz * one_minus_cos_theta + ny * sin_theta;
+	R.m[2][1] = ny * nz * one_minus_cos_theta - nx * sin_theta;
+	R.m[2][2] = nz * nz * one_minus_cos_theta + cos_theta;
+
+	// 4x4 行列なので、平行移動成分はなし (単位行列のまま)
+	R.m[0][3] = 0.0f;
+	R.m[1][3] = 0.0f;
+	R.m[2][3] = 0.0f;
+	R.m[3][0] = 0.0f;
+	R.m[3][1] = 0.0f;
+	R.m[3][2] = 0.0f;
+	R.m[3][3] = 1.0f;
+
+	return R;
+}

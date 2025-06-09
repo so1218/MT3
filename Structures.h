@@ -59,6 +59,19 @@ struct Vector3
 	{
 		return scalar != 0 ? Vector3(x / scalar, y / scalar, z / scalar) : Vector3(0, 0, 0);
 	}
+	// クロス積 (外積)
+	Vector3 cross(const Vector3& other) const {
+		return Vector3(
+			y * other.z - z * other.y,
+			z * other.x - x * other.z,
+			x * other.y - y * other.x
+		);
+	}
+
+	// ベクトルの長さ (マグニチュード)
+	float length() const {
+		return std::sqrt(x * x + y * y + z * z);
+	}
 
 	Vector3 Normalize() const
 	{
